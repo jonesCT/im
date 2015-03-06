@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Brad client</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+    </style>
+  </head>
+  <body>
+    <ul id="messages"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+
+      var token = '00000000';
+      var user_id = '001';
+      var user_name = 'Brad Lan';
+      var receiver_id = '002';
+      var receiver_name = 'Jones Hsu';
+      var date = new Date();
+      var messageList = [];
+      var messageRecord = {};
+      
+      var socket = io.connect('http://localhost:8080', { query: 'token=' + token + '&user_id=' + user_id + '&user_name=' + user_name });
+      
+      
+      socket.on('receiveMessage', function(data){
+        
+          if (data.sender_id !== user_id) {
+            var index = messageList.length
+            messageList.push(index);
+            messageRecord[data.message_id] = index;
+            $('#messages').append($('<li>').text(data.sender_name + " ( "+ data.time + " ) : "+ data.content).attr('id', 'id'+index));
+            socket.emit('readMessage', {id: data.id, message_id: data.message_id, sender_id: data.sender_id, sender_name: data.sender_name});
+          }
+          else {
+            if (typeof messageRecord[data.id] !== 'undefined')
+              $('#id'+data.id).append(' (Sended) ');
+            else {
+              var index = messageList.length
+              messageList.push(index);
+              messageRecord[data.message_id] = index;
+              $('#messages').append($('<li>').text(data.sender_name + " ( "+ data.time + " ) : "+ data.content + ' (Sended) ').attr('id', 'id'+index));
+            }
+          }         
+
+      });
+
+      socket.on('updateReadedMessage', function(data) {
+          // if (data.sender_id === user_id) {
+            // $('#id'+data.id).append( '已讀' + "  " + data.readed_message_list);
+          // }
+          for (var i=0 ; i < data.readed_message_list.length; i++) {
+            if (data.readed_message_list[i].sender_id === user_id) {
+                if (typeof messageRecord[data.readed_message_list[i].id] !== 'undefined')
+                  $('#id'+ messageRecord[data.readed_message_list[i].id]).append( ' 已讀 ' );
+                else if (typeof messageRecord[data.readed_message_list[i].message_id] !== 'undefined')
+                  $('#id'+ messageRecord[data.readed_message_list[i].message_id]).append( ' 已讀 ' );  
+            }
+          }
+          
+      });    
+
+
+      $('form').submit(function(){
+
+          var year = date.getFullYear();
+          var month = date.getMonth() + 1;
+          var day = date.getDay();
+          var hour = date.getHours();
+          var minute = date.getMinutes();
+          var time = year + "-" + month + "-" + day + " " + hour + ":" + minute;
+
+          var index = messageList.length;
+          messageList.push(index);
+          messageRecord[index] = index;
+          $('#messages').append($('<li>').text(user_name + " ( "+ time + " ) : "+ $('#m').val()).attr('id', 'id'+index));      
+          socket.emit('sendMessage', {id: index, 'content': $('#m').val(), time: time});
+
+          $('#m').val("");
+
+          return false;
+      });
+
+      socket.on('connected', function(data) {
+        $('#messages').append($('<li>').text(data.status));
+        socket.emit("joinRoom", {receiver_id: receiver_id, receiver_name: receiver_name}); 
+
+      });
+
+      socket.on('Authorization failure', function(data) {
+        $('#messages').append($('<li>').text(data.error));
+      });
+
+
+    </script>
+  </body>
+</html> 
